@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Loop</title>
+</head>
+
+<body>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #080808;
+            color: white;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .text-loop-section {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .text-loop {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            isolation: isolate;
+
+            --loop-height: 220px;
+            --loop-font-size: 46px;
+            --loop-font-weight: 800;
+            --loop-letter-spacing: 2;
+            --loop-color: #ffffff;
+            --loop-ribbon-color: #5227FF;
+            --loop-ribbon-width: 86px;
+            --loop-ribbon-opacity: 1;
+        }
+
+        .text-loop-svg {
+            display: block;
+            width: 100%;
+            height: var(--loop-height);
+            overflow: visible;
+        }
+
+        .text-loop-text {
+            user-select: none;
+            pointer-events: none;
+            font-family: inherit;
+            dominant-baseline: middle;
+            fill: var(--loop-color);
+            font-size: var(--loop-font-size);
+            font-weight: var(--loop-font-weight);
+            letter-spacing: var(--loop-letter-spacing);
+        }
+
+        .text-loop-ribbon {
+            fill: none;
+            stroke: var(--loop-ribbon-color);
+            stroke-width: var(--loop-ribbon-width);
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            opacity: var(--loop-ribbon-opacity);
+            pointer-events: none;
+        }
+
+        .text-loop-ribbon[hidden] {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .text-loop {
+                --loop-height: 170px;
+                --loop-font-size: 34px;
+            }
+        }
+    </style>
+
+    <section class="text-loop-section">
+        <div class="text-loop" id="textLoop" role="marquee" aria-label="React Bits"
+            data-text="React ✦ Bits" data-shape="wave" data-speed="90" data-direction="forward" data-separator="✦"
+            data-curviness="58" data-font-size="46" data-font-weight="800" data-letter-spacing="2"
+            data-uppercase="true" data-color="#ffffff" data-ribbon="true" data-ribbon-color="#5227FF"
+            data-ribbon-width="86" data-ribbon-opacity="1" data-pause-on-hover="true" data-reduce-motion="auto">
+
+            <svg class="text-loop-svg" viewBox="0 0 1200 220" preserveAspectRatio="none" aria-hidden="true"
+                focusable="false">
+
+                <defs>
+                    <path id="textLoopPath" />
+                </defs>
+
+                <use class="text-loop-ribbon" href="#textLoopPath" />
+
+                <text class="text-loop-text">
+                    <textPath id="textLoopText" href="#textLoopPath" startOffset="0%" />
+                </text>
+
+            </svg>
+        </div>
+    </section>
+
+    <script>
+        (() => {
+            "use strict";
+
+            const NUM = (v, fallback) => {
+                const n = Number(v);
+                return Number.isFinite(n) ? n : fallback;
+            };
+
+            const BOOL = (v, fallback = false) => {
+                if (v === undefined || v === null || v === "") return fallback;
+                return String(v).toLowerCase() === "true";
+            };
+
+            const prefersReducedMotion = window.matchMedia(
+                "(prefers-reduced-motion: reduce)"
+            );
+
+            class TextLoop {
+                constructor(root) {
+                    this.root = root;
+                    this.svg = root.querySelector(".text-loop-svg");
+                    this.path = root.querySelector("#textLoopPath");
+                    this.textPath = root.querySelector("#textLoopText");
+                    this.textElement = root.querySelector(".text-loop-text");
+                    this.ribbonElement = root.querySelector(".text-loop-ribbon");
+
+                    this.config = this.readConfig();
+
+                    this.offset = 0;
+                    this.lastTime = performance.now();
+                    this.paused = false;
+                    this.rafId = null;
+                    this.resizeRaf = null;
+
+                    // Cached geometry used for seamless looping
+                    this.pathLength = 0;
+                    this.repeatLength = 0; // px length of ONE full text+separator repetition
+
+                    this.applyText();
+                    this.applyStyles();
+                    this.applyRibbon();
+                    this.buildPath();
+
+                    // Recompute after the browser has laid out fonts/metrics
+                    this.measure();
+
+                    this.bindEvents();
+                    this.resize();
+
+                    if (!this.config.reduceMotion) {
+                        this.rafId = requestAnimationFrame(this.animate);
+                    }
+                }
+
+                readConfig() {
+                    const d = this.root.dataset;
+
+                    const reduceMotionSetting = (d.reduceMotion || "auto").toLowerCase();
+                    const reduceMotion =
+                        reduceMotionSetting === "true" ||
+                        (reduceMotionSetting === "auto" && prefersReducedMotion.matches);
+
+                    return {
+                        text: d.text || "",
+                        shape: (d.shape || "wave").toLowerCase(),
+                        speed: NUM(d.speed, 90),
+                        direction: (d.direction || "forward").toLowerCase() === "backward"
+                            ? "backward"
+                            : "forward",
+                        separator: d.separator || "✦",
+                        curviness: Math.min(Math.max(NUM(d.curviness, 58), 0), 100),
+                        fontSize: NUM(d.fontSize, 46),
+                        fontWeight: NUM(d.fontWeight, 800),
+                        letterSpacing: NUM(d.letterSpacing, 2),
+                        uppercase: BOOL(d.uppercase, false),
+                        color: d.color || "#ffffff",
+                        ribbon: BOOL(d.ribbon, true),
+                        ribbonColor: d.ribbonColor || "#5227FF",
+                        ribbonWidth: NUM(d.ribbonWidth, 86),
+                        ribbonOpacity: Math.min(Math.max(NUM(d.ribbonOpacity, 1), 0), 1),
+                        pauseOnHover: BOOL(d.pauseOnHover, true),
+                        reduceMotion,
+                    };
+                }
+
+                applyText() {
+                    const { text, separator, uppercase } = this.config;
+                    if (!text) return;
+
+                    const base = uppercase ? text.toUpperCase() : text;
+
+                    // Build one repetition unit. We repeat it enough times to
+                    // overflow the path generously in both directions so the
+                    // scrolling window is always fully covered.
+                    const unit = `${base} ${separator} `;
+                    this.repeatUnit = unit;
+                    this.textPath.textContent = unit.repeat(60);
+                }
+
+                applyStyles() {
+                    const s = this.root.style;
+                    const c = this.config;
+
+                    s.setProperty("--loop-font-size", `${c.fontSize}px`);
+                    s.setProperty("--loop-font-weight", String(c.fontWeight));
+                    s.setProperty("--loop-letter-spacing", String(c.letterSpacing));
+                    s.setProperty("--loop-color", c.color);
+                }
+
+                applyRibbon() {
+                    const c = this.config;
+                    const r = this.ribbonElement;
+
+                    if (!c.ribbon) {
+                        r.hidden = true;
+                        return;
+                    }
+
+                    r.hidden = false;
+                    this.root.style.setProperty("--loop-ribbon-color", c.ribbonColor);
+                    this.root.style.setProperty("--loop-ribbon-width", `${c.ribbonWidth}px`);
+                    this.root.style.setProperty("--loop-ribbon-opacity", String(c.ribbonOpacity));
+                }
+
+                buildPath() {
+                    const { shape, curviness } = this.config;
+                    const height = 220;
+                    const center = height / 2;
+
+                    let d;
+
+                    if (shape === "wave") {
+                        const curve = curviness;
+                        d = [
+                            `M -400 ${center}`,
+                            `Q 150 ${center - curve} 400 ${center}`,
+                            `T 800 ${center}`,
+                            `T 1200 ${center}`,
+                            `T 1600 ${center}`,
+                            `T 2000 ${center}`,
+                        ].join(" ");
+                    } else {
+                        // Extend well beyond both viewport edges so scrolling never
+                        // reveals an empty end.
+                        d = `M -400 ${center} L 2000 ${center}`;
+                    }
+
+                    this.path.setAttribute("d", d);
+                }
+
+                /* =========================
+                   SEAMLESS LOOP MEASUREMENT
+                ========================= */
+
+                /**
+                 * Measures:
+                 *  - total path length (px)
+                 *  - length of ONE repetition of the text unit along the path
+                 *
+                 * Then computes how many pixels to translate per loop cycle so the
+                 * wrap point is invisible.
+                 */
+                measure() {
+                    if (typeof this.path.getTotalLength !== "function") return;
+
+                    this.pathLength = this.path.getTotalLength();
+
+                    // Measure one repetition by temporarily rendering just the unit
+                    const original = this.textPath.textContent;
+                    this.textPath.textContent = this.repeatUnit;
+
+                    // getComputedTextLength returns the length of the rendered text
+                    // along the path (in user units). Fall back gracefully.
+                    let unitLength = 0;
+                    try {
+                        unitLength = this.textElement.getComputedTextLength();
+                    } catch (e) {
+                        unitLength = 0;
+                    }
+
+                    // Restore the long repeated text
+                    this.textPath.textContent = original;
+
+                    // If measurement failed, estimate from characters
+                    if (!unitLength || !Number.isFinite(unitLength)) {
+                        const approxCharWidth = this.config.fontSize * 0.6;
+                        unitLength =
+                            (this.repeatUnit.length) * approxCharWidth +
+                            this.config.letterSpacing * this.repeatUnit.length;
+                    }
+
+                    this.repeatLength = unitLength;
+
+                    // Convert to a percentage of the total path length.
+                    // This is the amount of startOffset we scroll per loop cycle.
+                    this.repeatPercent =
+                        this.pathLength > 0
+                            ? (this.repeatLength / this.pathLength) * 100
+                            : 5; // safe fallback
+                }
+
+                /* =========================
+                   ANIMATION
+                ========================= */
+
+                animate = (currentTime) => {
+                    const delta = Math.min(currentTime - this.lastTime, 100);
+                    this.lastTime = currentTime;
+
+                    if (!this.paused && this.repeatPercent) {
+                        const dir = this.config.direction === "forward" ? 1 : -1;
+
+                        // Advance offset by pixels, then convert to % of path.
+                        const pixels = (this.config.speed * delta * dir) / 1000;
+                        const percent = (pixels / this.pathLength) * 100;
+
+                        this.offset += percent;
+
+                        // Wrap within [0, repeatPercent) so the wrap point
+                        // coincides with one full text repetition → seamless.
+                        const loop = this.repeatPercent;
+                        let wrapped = ((this.offset % loop) + loop) % loop;
+
+                        // For forward motion we want text moving left, which means
+                        // startOffset decreasing. Negate for that direction.
+                        const displayOffset = dir === 1 ? -wrapped : wrapped;
+
+                        this.textPath.setAttribute("startOffset", `${displayOffset}%`);
+                    }
+
+                    this.rafId = requestAnimationFrame(this.animate);
+                };
+
+                /* ---------- events ---------- */
+
+                bindEvents() {
+                    if (this.config.pauseOnHover) {
+                        this.root.addEventListener("mouseenter", this.handleEnter);
+                        this.root.addEventListener("mouseleave", this.handleLeave);
+                        this.root.addEventListener("focusin", this.handleEnter);
+                        this.root.addEventListener("focusout", this.handleLeave);
+                    }
+
+                    window.addEventListener("resize", this.handleResize, { passive: true });
+
+                    // Re-measure once webfonts are ready (text metrics can change)
+                    if (document.fonts && document.fonts.ready) {
+                        document.fonts.ready.then(() => {
+                            this.measure();
+                        });
+                    }
+
+                    if (typeof prefersReducedMotion.addEventListener === "function") {
+                        prefersReducedMotion.addEventListener("change", this.handleMotionChange);
+                    } else if (typeof prefersReducedMotion.addListener === "function") {
+                        prefersReducedMotion.addListener(this.handleMotionChange);
+                    }
+
+                    document.addEventListener("visibilitychange", this.handleVisibility);
+                }
+
+                handleEnter = () => { this.paused = true; };
+                handleLeave = () => { this.paused = false; };
+
+                handleResize = () => {
+                    if (this.resizeRaf) return;
+                    this.resizeRaf = requestAnimationFrame(() => {
+                        this.resizeRaf = null;
+                        this.resize();
+                        this.measure();
+                    });
+                };
+
+                handleMotionChange = (e) => {
+                    const setting = (this.root.dataset.reduceMotion || "auto").toLowerCase();
+                    if (setting !== "auto") return;
+
+                    if (e.matches) {
+                        if (this.rafId) cancelAnimationFrame(this.rafId);
+                        this.rafId = null;
+                    } else if (!this.rafId) {
+                        this.lastTime = performance.now();
+                        this.rafId = requestAnimationFrame(this.animate);
+                    }
+                };
+
+                handleVisibility = () => {
+                    if (document.hidden) {
+                        if (this.rafId) {
+                            cancelAnimationFrame(this.rafId);
+                            this.rafId = null;
+                        }
+                    } else if (!this.rafId && !this.config.reduceMotion) {
+                        this.lastTime = performance.now();
+                        this.rafId = requestAnimationFrame(this.animate);
+                    }
+                };
+
+                resize() {
+                    const width = Math.max(this.root.offsetWidth, 1200);
+                    this.svg.setAttribute("viewBox", `0 0 ${width} 220`);
+                }
+
+                destroy() {
+                    if (this.rafId) cancelAnimationFrame(this.rafId);
+                    if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
+                    this.root.removeEventListener("mouseenter", this.handleEnter);
+                    this.root.removeEventListener("mouseleave", this.handleLeave);
+                    this.root.removeEventListener("focusin", this.handleEnter);
+                    this.root.removeEventListener("focusout", this.handleLeave);
+                    window.removeEventListener("resize", this.handleResize);
+                    document.removeEventListener("visibilitychange", this.handleVisibility);
+                }
+            }
+
+            const init = () => {
+                document.querySelectorAll("#textLoop").forEach((el) => {
+                    if (!el.__textLoopInstance) {
+                        el.__textLoopInstance = new TextLoop(el);
+                    }
+                });
+            };
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+
+            window.TextLoop = TextLoop;
+        })();
+    </script>
+</body>
+
+</html>
