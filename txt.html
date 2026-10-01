@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circle Page Transition · Hero + Navbar</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f5f5f5;
+        }
+
+        body {
+            overflow-x: hidden;
+        }
+
+        /* =========================================
+           NAVBAR
+        ========================================= */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 1.25rem 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+            color: #111;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #000;
+        }
+
+        .nav-cta {
+            padding: 0.6rem 1.25rem;
+            background: #111;
+            color: white !important;
+            border-radius: 100px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .nav-cta:hover {
+            background: #333;
+            color: white;
+        }
+
+        /* =========================================
+           HERO SECTION
+        ========================================= */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 2rem 1.5rem;
+            position: relative;
+            background: #f5f5f5;
+            gap: 1.5rem;
+        }
+
+        .hero h1 {
+            font-size: clamp(3.5rem, 12vw, 9rem);
+            font-weight: 800;
+            letter-spacing: -0.06em;
+            line-height: 1.05;
+            color: #111;
+            max-width: 14ch;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: #666;
+            max-width: 40ch;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero .page-link {
+            padding: 1rem 2.5rem;
+            border-radius: 100px;
+            background: #111;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: transform 0.2s, background 0.2s;
+            display: inline-block;
+        }
+
+        .hero .page-link:hover {
+            background: #222;
+            transform: scale(1.02);
+        }
+
+        /* subtle hero decoration */
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 20% 80%, rgba(0, 0, 0, 0.02) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* =========================================
+           PAGE TRANSITION
+        ========================================= */
+        .transition {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .transition-circle {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #e60909;
+            transform: scale(0);
+            will-change: transform;
+        }
+
+        .transition-circle:nth-child(2) {
+            background: #fea101;
+        }
+
+        .transition-circle:nth-child(3) {
+            background: #ff4603;
+        }
+
+        .transition-circle:nth-child(4) {
+            background: #f90404;
+        }
+
+        /* Logo that appears during the transition */
+        .transition-logo {
+            position: absolute;
+            z-index: 10;
+            color: rgb(252, 152, 2);
+            font-size: clamp(1.5rem, 4vw, 3rem);
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            opacity: 0;
+            pointer-events: none;
+            will-change: opacity, transform;
+            
+        }
+
+        /* =========================================
+           RESPONSIVE
+        ========================================= */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem 1.5rem;
+            }
+
+            .nav-links {
+                gap: 1.25rem;
+            }
+
+            .nav-links a {
+                font-size: 0.85rem;
+            }
+
+            .nav-cta {
+                padding: 0.5rem 1rem;
+                font-size: 0.8rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .hero .page-link {
+                padding: 0.85rem 2rem;
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .nav-links {
+                display: none;
+            }
+
+            .navbar {
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- =========================================
+         TRANSITION
+    ========================================== -->
+    <div class="transition">
+        <div class="transition-circle"></div>
+        <div class="transition-circle"></div>
+        <div class="transition-circle"></div>
+        <div class="transition-circle"></div>
+        <div class="transition-logo"><img src="Screenshot_2026-10-01_230650-removebg-preview 1.svg" alt="" height="50%"></div>
+    </div>
+
+    <!-- =========================================
+         NAVBAR
+    ========================================== -->
+    <nav class="navbar">
+        <a href="#" class="logo" data-transition>BLUESPEC</a>
+        <ul class="nav-links">
+            <li><a href="#" data-transition>Home</a></li>
+            <li><a href="#" data-transition>Work</a></li>
+            <li><a href="#" data-transition>About</a></li>
+            <li><a href="#" class="nav-cta" data-transition>Contact</a></li>
+        </ul>
+    </nav>
+
+    <!-- =========================================
+         HERO SECTION
+    ========================================== -->
+    <main class="hero">
+        <h1>Create without limits.</h1>
+        <p>Circular page transition with a clean hero and navigation.</p>
+        <a href="about.html" class="page-link" data-transition>
+            Go to About
+        </a>
+    </main>
+
+    <!-- GSAP -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+
+    <script>
+        /* =========================================
+           CIRCLE TRANSITION
+        ========================================== */
+        const transition = document.querySelector(".transition");
+        const circles = gsap.utils.toArray(".transition-circle");
+        const logo = document.querySelector(".transition-logo");
+
+        /*
+         * Calculate how large the circle needs
+         * to become to cover the entire screen.
+         */
+        function getScale() {
+            const radius = Math.sqrt(
+                window.innerWidth ** 2 + window.innerHeight ** 2
+            ) / 2;
+            const circleSize = 100;
+            return radius / (circleSize / 2);
+        }
+
+        /* =========================================
+           PAGE ENTER (reveal hero)
+        ========================================== */
+        function pageEnter() {
+            const scale = getScale();
+
+            /*
+             * Start with all circles covering the screen
+             * and the logo visible.
+             */
+            gsap.set(circles, {
+                scale: scale
+            });
+
+            gsap.set(logo, {
+                opacity: 1,
+                duration: 1,
+                y: 0
+            });
+
+            /*
+             * Reveal page by shrinking circles back toward the center,
+             * while fading out the logo.
+             */
+            const tl = gsap.timeline();
+
+            tl.to(logo, {
+                opacity: 0,
+                y: -20,
+                duration: 0.4,
+                ease: "power2.inOut"
+            }, 0.7)
+            .to(circles, {
+                scale: 0,
+                duration: 1.2,
+                stagger: {
+                    each: 0.12,
+                    from: "start"
+                },
+                ease: "expo.inOut"
+            }, 0.17);
+
+            return tl;
+        }
+
+        /* =========================================
+           PAGE EXIT
+        ========================================== */
+        function pageExit(url, callback) {
+            const tl = gsap.timeline({
+                onComplete: () => {
+                    if (callback) callback();
+                    if (url && url !== '#') {
+                        window.location.href = url;
+                    }
+                }
+            });
+
+            /*
+             * Circles expand outward from the center and cover the page.
+             * Once the screen is mostly covered, fade in the logo.
+             */
+            tl.to(circles, {
+                scale: getScale(),
+                duration: 1.1,
+                stagger: {
+                    each: 0.12,
+                    from: "start"
+                },
+                ease: "expo.inOut"
+            })
+            .to(logo, {
+                opacity: 1,
+                y: 0,
+                duration: 0.4,
+                ease: "power2.out"
+            }, "-=0.35");
+
+            return tl;
+        }
+
+        /* =========================================
+           INITIAL PAGE LOAD
+        ========================================== */
+        window.addEventListener("load", () => {
+            pageEnter();
+        });
+
+        /* =========================================
+           LINKS (all elements with [data-transition])
+        ========================================== */
+        document.querySelectorAll("[data-transition]").forEach(link => {
+            link.addEventListener("click", function(event) {
+                const url = this.getAttribute("href");
+
+                /*
+                 * Don't intercept modifier clicks.
+                 */
+                if (
+                    event.ctrlKey ||
+                    event.metaKey ||
+                    event.shiftKey ||
+                    event.altKey
+                ) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                /*
+                 * If the link points to "#" (dummy links in navbar),
+                 * we still run the exit animation but then
+                 * reset the page instead of navigating.
+                 */
+                if (!url || url === "#") {
+                    pageExit(null, () => {
+                        pageEnter();
+                    });
+                } else {
+                    pageExit(url);
+                }
+            });
+        });
+
+        /* =========================================
+           RESIZE
+        ========================================== */
+        window.addEventListener("resize", () => {
+            gsap.set(circles, {
+                scale: getScale()
+            });
+        });
+    </script>
+</body>
+</html>
